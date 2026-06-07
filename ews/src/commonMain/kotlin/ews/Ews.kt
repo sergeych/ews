@@ -1,7 +1,61 @@
+// Copyright (c) 2026 Sergey S. Chernov (real.sergeych@gmail.com)
+// SPDX-License-Identifier: MIT
+
 package ews
+
+/**
+ * A successful language candidate from [Ews.tryDecode].
+ */
+class EwsDecodeResult(
+    val language: String,
+    val decoded: ByteArray,
+) {
+    override fun equals(other: Any?): Boolean {
+        return other is EwsDecodeResult &&
+            language == other.language &&
+            decoded.contentEquals(other.decoded)
+    }
+
+    override fun hashCode(): Int {
+        return 31 * language.hashCode() + decoded.contentHashCode()
+    }
+
+    override fun toString(): String {
+        return "EwsDecodeResult(language=$language, decoded=${decoded.contentToString()})"
+    }
+}
 
 object Ews {
     const val name: String = "ews"
+
+    /**
+     * Try to decode [phrase] as an EWS phrase in every built-in vocabulary.
+     *
+     * Each phrase token is treated as a word prefix, not necessarily a complete
+     * word. For a language to be attempted, every token must be at least that
+     * vocabulary's [EwsVocabulary.minimumDistinctPrefixLength] and resolve to
+     * exactly one vocabulary word. Candidates that resolve structurally but fail
+     * the CRC/guard check are discarded.
+     *
+     * The returned list is usually empty or has one item, but it is a list
+     * because short CRCs and independent vocabularies can theoretically produce
+     * more than one valid language interpretation.
+     */
+    fun tryDecode(phrase: String): List<EwsDecodeResult> {
+        val prefixes = splitEwsPhrase(phrase)
+        if (prefixes.isEmpty()) return emptyList()
+
+        return EwsVocabularies.availableLanguages.mapNotNull { language ->
+            val vocabulary = EwsVocabularies.load(language)
+            val codes = prefixes.map { prefix ->
+                vocabulary.codeForUniquePrefixOrNull(prefix) ?: return@mapNotNull null
+            }
+            val decoded = runCatching { unpadSourceWithCrc(codes) }.getOrNull()
+                ?: return@mapNotNull null
+
+            EwsDecodeResult(language, decoded)
+        }
+    }
 }
 
 private const val BitsInByte = 8
@@ -9,6 +63,19 @@ private const val EwsWordSizeBits = 11
 private const val MinCrcBits = 4
 private const val MaxCrcBits = 14
 private const val GuardBits = 8
+
+private fun splitEwsPhrase(phrase: String): List<String> {
+    return phrase.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+}
+
+private fun EwsVocabulary.codeForUniquePrefixOrNull(prefix: String): Int? {
+    runCatching { codeOf(prefix) }.getOrNull()?.let { return it }
+
+    if (prefix.length < minimumDistinctPrefixLength) return null
+    val matches = wordsMatchingPrefix(prefix)
+    if (matches.size != 1) return null
+    return codeOf(matches.single())
+}
 
 /**
  * Encode source bytes into 11-bit EWS words with enough check bits to fill the
@@ -77,7 +144,7 @@ private fun decodeCandidate(bits: List<Int>, addedBits: Int): ByteArray? {
 
     return if (usesGuard(addedBits)) {
         val crcBits = addedBits - GuardBits
-        val source = bitsToBytes(bits, 0, sourceBits)
+        val source = bitsToBytes(bits, sourceBits)
         val guard = bitsToInt(bits, sourceBits, GuardBits)
         val encodedCrc = bitsToInt(bits, sourceBits + GuardBits, crcBits)
         val sourceWithGuard = source + guard.toByte()
@@ -91,7 +158,7 @@ private fun decodeCandidate(bits: List<Int>, addedBits: Int): ByteArray? {
             null
         }
     } else {
-        val source = bitsToBytes(bits, 0, sourceBits)
+        val source = bitsToBytes(bits, sourceBits)
         val encodedCrc = bitsToInt(bits, sourceBits, addedBits)
 
         if (calculateCrc(source, addedBits) == encodedCrc) source else null
@@ -183,13 +250,13 @@ private fun wordsToBits(words: List<Int>): List<Int> = buildList(words.size * Ew
     }
 }
 
-private fun bitsToBytes(bits: List<Int>, offset: Int, size: Int): ByteArray {
+private fun bitsToBytes(bits: List<Int>, size: Int): ByteArray {
     require(size % BitsInByte == 0) {
         "Bit sequence size should be a multiple of $BitsInByte: $size"
     }
 
     return ByteArray(size / BitsInByte) { index ->
-        bitsToInt(bits, offset + index * BitsInByte, BitsInByte).toByte()
+        bitsToInt(bits, index * BitsInByte, BitsInByte).toByte()
     }
 }
 

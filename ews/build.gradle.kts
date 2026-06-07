@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sergey S. Chernov (real.sergeych@gmail.com)
+// SPDX-License-Identifier: MIT
+
 plugins {
     kotlin("multiplatform")
 }

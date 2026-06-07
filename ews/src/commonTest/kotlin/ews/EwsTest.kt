@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sergey S. Chernov (real.sergeych@gmail.com)
+// SPDX-License-Identifier: MIT
+
 package ews
 
 import kotlin.test.Test
@@ -263,6 +266,95 @@ class EwsTest {
 
         assertFailsWith<IllegalArgumentException> {
             english.decode(corruptedWords)
+        }
+    }
+
+    @Test
+    fun ewsTryDecodeFindsExactWordLanguageCandidate() {
+        val english = EwsVocabularies.load("english")
+        val source = testBytes(19, 301)
+        val phrase = english.encodeToPhrase(source)
+
+        val result = Ews.tryDecode(phrase).single { it.language == "english" }
+
+        assertContentEquals(source, result.decoded)
+    }
+
+    @Test
+    fun ewsTryDecodeAcceptsMinimumDistinctPrefixes() {
+        val english = EwsVocabularies.load("english")
+        val source = testBytes(28, 302)
+        val prefixPhrase = english.encode(source)
+            .joinToString(" ") { word -> word.take(english.minimumDistinctPrefixLength) }
+
+        val result = Ews.tryDecode(prefixPhrase).single { it.language == "english" }
+
+        assertContentEquals(source, result.decoded)
+    }
+
+    @Test
+    fun ewsTryDecodeAcceptsLongerThanMinimumPrefixesWithoutFullWords() {
+        val english = EwsVocabularies.load("english")
+        val source = testBytes(18, 303)
+        val prefixPhrase = english.encode(source).joinToString(" ") { word ->
+            word.take((english.minimumDistinctPrefixLength + 1).coerceAtMost(word.length))
+        }
+
+        val result = Ews.tryDecode(prefixPhrase).single { it.language == "english" }
+
+        assertContentEquals(source, result.decoded)
+    }
+
+    @Test
+    fun ewsTryDecodeFindsRussianPrefixLanguageCandidate() {
+        val russian = EwsVocabularies.load("russian")
+        val source = testBytes(25, 304)
+        val prefixPhrase = russian.encode(source)
+            .joinToString(" ") { word -> word.take(russian.minimumDistinctPrefixLength) }
+
+        val result = Ews.tryDecode(prefixPhrase).single { it.language == "russian" }
+
+        assertContentEquals(source, result.decoded)
+    }
+
+    @Test
+    fun ewsTryDecodeReturnsEmptyForTooShortPrefixes() {
+        val english = EwsVocabularies.load("english")
+        val source = testBytes(17, 305)
+        val tooShortPhrase = english.encode(source)
+            .joinToString(" ") { word -> word.take(english.minimumDistinctPrefixLength - 1) }
+
+        assertEquals(emptyList(), Ews.tryDecode(tooShortPhrase))
+    }
+
+    @Test
+    fun ewsTryDecodeReturnsEmptyForUnknownPrefixes() {
+        assertEquals(emptyList(), Ews.tryDecode("not-a-word-prefix"))
+    }
+
+    @Test
+    fun ewsTryDecodeReturnsEmptyForCrcCorruption() {
+        val english = EwsVocabularies.load("english")
+        val source = testBytes(24, 306)
+        val words = english.encode(source)
+        val corruptedPhrase = firstCrcRejectedSingleWordMutation(english, words).joinToString(" ")
+
+        assertEquals(emptyList(), Ews.tryDecode(corruptedPhrase))
+    }
+
+    @Test
+    fun ewsTryDecodePreservesPossibleMultipleLanguageResults() {
+        val source = testBytes(29, 307)
+        val results = EwsVocabularies.availableLanguages.map { language ->
+            val vocabulary = EwsVocabularies.load(language)
+            val phrase = vocabulary.encode(source)
+                .joinToString(" ") { word -> word.take(vocabulary.minimumDistinctPrefixLength) }
+            Ews.tryDecode(phrase).single { it.language == language }
+        }
+
+        assertEquals(EwsVocabularies.availableLanguages, results.map { it.language })
+        results.forEach { result ->
+            assertContentEquals(source, result.decoded)
         }
     }
 
