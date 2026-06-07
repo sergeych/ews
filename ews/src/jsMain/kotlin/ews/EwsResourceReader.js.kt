@@ -78,7 +78,7 @@ private fun readBrowserResource(path: String): String? {
         } else {
             null
         }
-    } catch (failure: Throwable) {
+    } catch (_: Throwable) {
         null
     }
 }
