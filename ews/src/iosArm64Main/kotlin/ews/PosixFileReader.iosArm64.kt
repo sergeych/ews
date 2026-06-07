@@ -16,24 +16,7 @@ import platform.posix.fread
 import platform.posix.fseek
 import platform.posix.ftell
 
-internal actual fun readEwsResourceText(path: String): String {
-    for (candidate in candidatePaths(path)) {
-        val text = readFileText(candidate)
-        if (text != null) return text
-    }
-
-    throw IllegalArgumentException("Resource not found: $path")
-}
-
-private fun candidatePaths(path: String): List<String> = listOf(
-    path,
-    "ews/src/commonMain/resources/$path",
-    "src/commonMain/resources/$path",
-    "ews/build/processedResources/linuxX64/main/$path",
-    "build/processedResources/linuxX64/main/$path",
-)
-
-private fun readFileText(path: String): String? {
+internal fun readPosixFileText(path: String): String? {
     val file = fopen(path, "rb") ?: return null
     try {
         if (fseek(file, 0, SEEK_END) != 0) return null

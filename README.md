@@ -60,6 +60,40 @@ Current targets are configured in [ews/build.gradle.kts](ews/build.gradle.kts):
 - JS node
 - linuxX64
 
+## Add To Your Project
+
+EWS is published to a custom Maven repository. Add the repository to your
+Gradle settings:
+
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        maven("https://gitea.sergeych.net/api/packages/SergeychWorks/maven")
+    }
+}
+```
+
+Then add the dependency:
+
+```kotlin
+dependencies {
+    implementation("net.sergeych:ews:0.1.1-SNAPSHOT")
+}
+```
+
+For a Kotlin Multiplatform project, add it to the source set where you use EWS:
+
+```kotlin
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("net.sergeych:ews:0.1.1-SNAPSHOT")
+        }
+    }
+}
+```
+
 ## Basic Usage
 
 Load a vocabulary and encode raw bytes:
