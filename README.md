@@ -101,7 +101,7 @@ Load a vocabulary and encode raw bytes:
 ```kotlin
 import ews.EwsVocabularies
 
-val vocabulary = EwsVocabularies.load("english")
+val vocabulary = EwsVocabularies["english"]
 val source: ByteArray = byteArrayOf(0x01, 0x23, 0x45, 0x67)
 
 val words: List<String> = vocabulary.encode(source)
@@ -140,8 +140,8 @@ val russianPhrase = russian.encodeTextToPhrase("пример")
 The same numeric EWS codes can be rendered in another vocabulary:
 
 ```kotlin
-val english = EwsVocabularies.load("english")
-val french = EwsVocabularies.load("french")
+val english = EwsVocabularies["english"]
+val french = EwsVocabularies["french"]
 
 val englishWords = english.encode(source)
 val codes = englishWords.map(english::codeOf)

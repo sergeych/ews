@@ -3,6 +3,8 @@
 
 package ews
 
+import kotlin.io.encoding.Base64
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -388,4 +390,5 @@ class EwsTest {
         }
         error("Could not find a CRC-rejected single-word mutation")
     }
+
 }

@@ -34,6 +34,9 @@ interface EwsVocabulary {
      *
      * Codes are zero-based indexes in this vocabulary and are therefore always
      * in `0..2047`.
+     *
+     * @throws IllegalArgumentException if [word] is not a complete word in this
+     *      vocabulary
      */
     fun codeOf(word: String): Int
 
@@ -41,6 +44,8 @@ interface EwsVocabulary {
      * Return the word for an 11-bit EWS [code].
      *
      * Codes are zero-based indexes in this vocabulary and must be in `0..2047`.
+     *
+     * @throws IllegalArgumentException if [code] is outside `0..2047`
      */
     fun wordOf(code: Int): String
 
@@ -60,6 +65,10 @@ interface EwsVocabulary {
      * All words must be complete vocabulary words. Prefix matching is available
      * separately through [wordsMatchingPrefix] so callers can resolve user input
      * before decoding.
+     *
+     * @throws IllegalArgumentException if any word is not in this vocabulary, or
+     *      if the resulting word-code sequence is empty, fails the CRC/guard
+     *      check, or has no single deterministic source interpretation
      */
     fun decode(words: List<String>): ByteArray {
         return unpadSourceWithCrc(words.map(::codeOf))
@@ -75,6 +84,8 @@ interface EwsVocabulary {
     /**
      * Decode EWS words from this vocabulary and interpret the result as UTF-8
      * text.
+     *
+     * @throws IllegalArgumentException if [decode] cannot decode [words]
      */
     fun decodeText(words: List<String>): String {
         return decode(words).decodeToString()
@@ -92,6 +103,11 @@ interface EwsVocabulary {
      *
      * Words are split on any Unicode whitespace. Empty or whitespace-only
      * phrases are rejected by the underlying CRC decoder.
+     *
+     * @throws IllegalArgumentException if any phrase token is not a complete word
+     *      in this vocabulary, or if the resulting word-code sequence is empty,
+     *      fails the CRC/guard check, or has no single deterministic source
+     *      interpretation
      */
     fun decodePhrase(phrase: String): ByteArray {
         return decode(splitPhrase(phrase))
@@ -107,6 +123,8 @@ interface EwsVocabulary {
     /**
      * Decode a separator-delimited EWS phrase and interpret the result as UTF-8
      * text.
+     *
+     * @throws IllegalArgumentException if [decodePhrase] cannot decode [phrase]
      */
     fun decodePhraseToText(phrase: String): String {
         return decodePhrase(phrase).decodeToString()
@@ -152,10 +170,19 @@ object EwsVocabularies {
         lazy { loadVocabulary(language) }
     }
 
+    /**
+     * Load vocabulary by language id.
+     * @throws IllegalArgumentException if [language] is not a known vocabulary language
+     */
     fun load(language: String): EwsVocabulary {
         return vocabularies[language]?.value
             ?: throw IllegalArgumentException("Unknown EWS vocabulary language: $language")
     }
+
+    /**
+     * Get vocabulary by language id. Same as [load].
+     */
+    operator fun get(language: String): EwsVocabulary = load(language)
 
     private fun loadVocabulary(language: String): EwsVocabulary {
         val text = readEwsResourceText("$ResourceDirectory/$language.txt")

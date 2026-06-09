@@ -24,7 +24,7 @@ internal fun readPosixFileText(path: String): String? {
         if (size < 0) return null
         if (fseek(file, 0, SEEK_SET) != 0) return null
 
-        val bytes = ByteArray(size.toInt())
+        val bytes = ByteArray(size)
         val read = bytes.usePinned { pinned ->
             fread(pinned.addressOf(0), 1.convert(), bytes.size.convert(), file).toInt()
         }
